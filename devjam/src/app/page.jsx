@@ -7,6 +7,12 @@ import EntryScreen from './art/entryscreen';
 import createCar from './art/Car';
 import createCrowd from './art/createCrowd';
 import F1Dashboard from './art/F1Dashboard';
+import CollisionScreen from './art/CollisionScreen';
+import { GameScene } from './game/components/GameScene';
+import { useGameState } from './game/hooks/useGameState';
+import { useGameControls } from './game/hooks/useGameControls';
+import { useMobileControls } from './game/hooks/useMobileControls';
+
 export default function Home() {
   const mountRef = useRef(null);
   const rendererRef = useRef(null);
@@ -44,19 +50,51 @@ export default function Home() {
     brake: false,
     boost: false
   });
+  const [collision, setCollision] = useState(false);
+  const [gameStartTime, setGameStartTime] = useState(null);
+  const [fireParticles, setFireParticles] = useState([]);
+  const [startingLights, setStartingLights] = useState([false, false, false, false, false]);
+  const [countdownStarted, setCountdownStarted] = useState(false);
+  const [playerName, setPlayerName] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('playerName') || '';
+    }
+    return '';
+  });
+  const [aiCarNames, setAiCarNames] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return JSON.parse(localStorage.getItem('aiCarNames') || '[]');
+    }
+    return [];
+  });
   
+  const {
+    gameState,
+    updateGameState,
+    resetGame: resetGameState,
+    startGame: startGameState,
+    handleCollision,
+    completeLap,
+    updatePlayerPosition,
+    updateSpeed,
+    toggleDRS
+  } = useGameState();
+
+  useGameControls(gameState, updateGameState);
+  const { mobileControls: gameMobileControls, handleTouchStart, handleTouchEnd } = useMobileControls(gameState, updateGameState);
+
   // Car models data
   const carModels = [
-    { name: "Red Bull Racing", color: 0x0600EF, secondaryColor: 0xFFD700 , image : "red-bull-racing" },
-    { name: "Ferrari", color: 0xFF0000, secondaryColor: 0x000000 , image : "ferrari"},
-    { name: "Mercedes AMG", color: 0x00D2BE, secondaryColor: 0x000000, image : "mercedes" },
-    { name: "McLaren", color: 0xFF8700, secondaryColor: 0x0000FF , image : "mclaren"},
-    { name: "Aston Martin", color: 0x006F62, secondaryColor: 0xFFFFFF , image : "aston-martin"},
-    { name: "Alpine", color: 0x0090FF, secondaryColor: 0xFF0000 , image : "alpine"},
-    { name: "Williams", color: 0x005AFF, secondaryColor: 0xFFFFFF , image : "williams"},
-    { name: "Racing Bulls", color: 0x2B4562, secondaryColor: 0xFFFFFF, image : "racing-bulls" },
-    { name: "Kick Sauber", color: 0x900000, secondaryColor: 0xFFFFFF , image : "kick-sauber" },
-    { name: "Haas F1", color: 0xFFFFFF, secondaryColor: 0xFF0000, image : "haas" }
+    { name: "Red Bull Racing", color: 0x0600EF, secondaryColor: 0xFFD700, image: "red-bull-racing" },
+    { name: "Ferrari", color: 0xFF0000, secondaryColor: 0x000000, image: "ferrari" },
+    { name: "Mercedes AMG", color: 0x00D2BE, secondaryColor: 0x000000, image: "mercedes" },
+    { name: "McLaren", color: 0xFF8700, secondaryColor: 0x0000FF, image: "mclaren" },
+    { name: "Aston Martin", color: 0x006F62, secondaryColor: 0xFFFFFF, image: "aston-martin" },
+    { name: "Alpine", color: 0x0090FF, secondaryColor: 0xFF0000, image: "alpine" },
+    { name: "Williams", color: 0x005AFF, secondaryColor: 0xFFFFFF, image: "williams" },
+    { name: "Racing Bulls", color: 0x2B4562, secondaryColor: 0xFFFFFF, image: "racing-bulls" },
+    { name: "Kick Sauber", color: 0x900000, secondaryColor: 0xFFFFFF, image: "kick-sauber" },
+    { name: "Haas F1", color: 0xFFFFFF, secondaryColor: 0xFF0000, image: "haas" }
   ];
   
   //   const carModels = [
@@ -242,39 +280,46 @@ export default function Home() {
     playerCar.position.set(gridPositionsX[2], 0, 20);
     scene.add(playerCar);
     
-    // Create AI cars
-    const aiCars = [];
-    for (let i = 0; i < 9; i++) {
-      const teamIndex = i < carModels.length ? i : Math.floor(Math.random() * carModels.length);
-      const teamColor = i === selectedCar ? 0x444444 : carModels[teamIndex].color;
-      const secondaryColor = i === selectedCar ? 0x666666 : carModels[teamIndex].secondaryColor;
-      
-      const aiCar = createCar(teamColor, secondaryColor);
-      
-      // Determine starting grid position
-      let gridX, gridZ;
-      
-      if (i < 5) {
-        gridX = gridPositionsX[i];
-        gridZ = 20;
-      } else {
-        gridX = gridPositionsX[i - 5];
-        gridZ = 24;
-      }
-      
-      aiCar.position.set(gridX, 0, gridZ);
-      scene.add(aiCar);
-      
-      // Store speed and other properties for AI behavior
-      aiCars.push({
-        mesh: aiCar,
-        speed: 0.2 + Math.random() * 0.5, // Random speed between 0.2 and 0.7
-        wobble: Math.random() * 0.05,     // Random car movement
-        lap: 1,
-        initialPos: aiCar.position.clone(),
-        teamIndex:teamIndex
-      });
-    }
+ 
+// Create AI cars with better spacing
+const aiCars = [];
+const gridSpacing = 10; // Increased spacing between cars (was 8)
+const gridRows = 3;    // Number of rows in the grid
+const gridCols = 3;   
+
+for (let i = 0; i < 9; i++) {
+  const teamIndex = i < carModels.length ? i : Math.floor(Math.random() * carModels.length);
+  const teamColor = i === selectedCar ? 0x444444 : carModels[teamIndex].color;
+  const secondaryColor = i === selectedCar ? 0x666666 : carModels[teamIndex].secondaryColor;
+  
+  const aiCar = createCar(teamColor, secondaryColor);
+  
+  // Calculate grid position
+  const row = Math.floor(i / gridCols);
+  const col = i % gridCols;
+  
+  const xOffset = (col - 1) * gridSpacing;
+  const zOffset = (row + 1) * gridSpacing;
+  
+  aiCar.position.set(xOffset, 0, 30 + zOffset);
+  scene.add(aiCar);
+  
+  // Create name tag
+  const nameTag = createNameTag(aiCarNames[i] || `AI ${i + 1}`);
+  aiCar.add(nameTag);
+  
+  aiCars.push({
+    mesh: aiCar,
+    speed: 0,
+    maxSpeed: 0.4 + Math.random() * 0.6, // Increased max speed
+    acceleration: 0.002 + Math.random() * 0.003, // Increased acceleration
+    wobble: Math.random() * 0.03,
+    lap: 1,
+    initialPos: aiCar.position.clone(),
+    teamIndex: teamIndex,
+    name: aiCarNames[i] || `AI ${i + 1}`
+  });
+}
     
     gameRef.current.aiCars = aiCars;
     
@@ -316,12 +361,6 @@ export default function Home() {
     const handleKeyDown = (e) => {
       if (keys.hasOwnProperty(e.code)) {
         keys[e.code] = true;
-        
-        // Start the game when arrow up is pressed
-        if (!gameRef.current.started && e.code === 'ArrowUp') {
-          gameRef.current.started = true;
-          setStarted(true);
-        }
       }
     };
     
@@ -343,22 +382,92 @@ export default function Home() {
     
     window.addEventListener('resize', handleResize);
     
+  // Add collision detection function
+const checkCollision = (car1, car2) => {
+  // Only check for collisions after 5 seconds from race start
+  // AND only if we've moved some distance from the starting grid
+  // if (!gameRef.current.started || 
+  //     !gameStartTime || 
+  //     Date.now() - gameStartTime < 5000 ||
+  //     playerCar.position.z < 80) {
+  //     console.log("Collision detection disabled");   // Allow cars to clear starting grid
+  //   return false;
+  // }
+  
+  const dx = car1.position.x - car2.position.x;
+  const dz = car1.position.z - car2.position.z;
+  const distance = Math.sqrt(dx * dx + dz * dz);
+  console.log(distance < 2 ,"collision" );
+  // Make collision detection less sensitive
+  return distance < 2; // Reduced from 2 to make collisions less frequent
+};
+    
+    // Add fire particle system function
+    const createFireParticles = (position) => {
+      const particles = [];
+      const particleCount = 100; // Increased particle count
+      const particleGeometry = new THREE.SphereGeometry(0.3, 8, 8); // Slightly larger particles
+      
+      // Create multiple particle materials for different colors
+      const materials = [
+        new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 1 }), // Orange
+        new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 1 }), // Red
+        new THREE.MeshBasicMaterial({ color: 0xff3300, transparent: true, opacity: 1 }), // Deep Orange
+        new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 1 })  // Yellow
+      ];
+
+      for (let i = 0; i < particleCount; i++) {
+        const particle = new THREE.Mesh(particleGeometry, materials[Math.floor(Math.random() * materials.length)]);
+        particle.position.copy(position);
+        
+        // Create a more explosive velocity pattern
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 0.5 + Math.random() * 1;
+        particle.velocity = new THREE.Vector3(
+          Math.cos(angle) * speed,
+          Math.random() * speed,
+          Math.sin(angle) * speed
+        );
+        
+        particle.life = 1.0;
+        particle.rotationSpeed = (Math.random() - 0.5) * 0.2; // Add rotation
+        particles.push(particle);
+      }
+      return particles;
+    };
+    
     // Game loop
     const animate = () => {
       const animationId = requestAnimationFrame(animate);
       gameRef.current.animation = animationId;
       
-      if (gameRef.current.gameOver) {
-        // Slowly spin the car if game over
+      if (gameRef.current.gameOver || collision) {
+        // Update fire particles with rotation and scaling
+        fireParticles.forEach((particle, index) => {
+          particle.life -= 0.02;
+          particle.material.opacity = particle.life;
+          particle.position.add(particle.velocity);
+          particle.velocity.y += 0.01; // Gravity effect
+          particle.rotation.x += particle.rotationSpeed;
+          particle.rotation.y += particle.rotationSpeed;
+          particle.scale.multiplyScalar(0.98); // Particles shrink over time
+          
+          if (particle.life <= 0) {
+            scene.remove(particle);
+            fireParticles.splice(index, 1);
+          }
+        });
+
+        // Slowly spin the car if game over or collision
         playerCar.rotation.y += 0.05;
         renderer.render(scene, camera);
         return;
       }
       
-      if (!gameRef.current.started) {
-        renderer.render(scene, camera);
-        return;
-      }
+      // if (!gameRef.current.started) {
+      //   renderer.render(scene, camera);
+      //   return;
+      // }
       
       // Animate flags
       if (gameRef.current.flags) {
@@ -368,65 +477,52 @@ export default function Home() {
       }
       
       // Handle car controls - keyboard or mobile joystick
-    // Handle car controls - keyboard or mobile joystick
-if (keys.ArrowUp || keys.ArrowUp) {
-  gameRef.current.carSpeed += acceleration;
-}
+    if (keys.ArrowUp || gameState.mobileControls.accelerate) {
+      gameRef.current.carSpeed += acceleration;
+    }
 
-if (keys.ArrowDown || keys.ArrowDown) {
-  gameRef.current.carSpeed -= braking;
-}
+    if (keys.ArrowDown || gameState.mobileControls.brake) {
+      gameRef.current.carSpeed -= braking;
+    }
 
-// Apply boost
+    if (keys.ArrowLeft || gameState.mobileControls.left) {
+      playerCar.position.x += handling;
+      playerCar.rotation.z = Math.min(playerCar.rotation.z + 0.01, -0.1);
+    } else if (keys.ArrowRight || gameState.mobileControls.right) {
+      playerCar.position.x -= handling;
+      playerCar.rotation.z = Math.max(playerCar.rotation.z - 0.01, 0.1);
+    } else {
+      playerCar.rotation.z *= 0.9;
+    }
 
-// In the animate function, replace the existing Space key handling
-if (keys.Space) {
-  // Increment DRS time
-  gameRef.current.drsTime++;
-  
-  // Activate DRS if not already active
-  if (!gameRef.current.drsActive) {
-    gameRef.current.drsActive = true;
-  }
-  
-  // Boost speed
-  gameRef.current.carSpeed += 0.2;
-  
-  // Limit DRS to 3 seconds (180 frames at 60fps)
-  if (gameRef.current.drsTime >= 5) {
-    gameRef.current.drsActive = false;
-    gameRef.current.drsTime = 0;
-  }
-} else {
-  // Reset DRS when space bar is released
-  if (gameRef.current.drsActive) {
-    gameRef.current.drsActive = false;
-    gameRef.current.drsTime = 0;
-  }
-}
-      if (gameRef.current.boostTime > 0) {
-        // setDrsActive(false);
-
-        gameRef.current.boostTime--;
-
+    // Handle boost
+    if (keys.Space || gameState.mobileControls.boost) {
+      gameRef.current.drsTime++;
+      
+      if (!gameRef.current.drsActive) {
+        gameRef.current.drsActive = true;
       }
+      
+      gameRef.current.carSpeed += 0.2;
+      
+      if (gameRef.current.drsTime >= 5) {
+        gameRef.current.drsActive = false;
+        gameRef.current.drsTime = 0;
+      }
+    } else {
+      if (gameRef.current.drsActive) {
+        gameRef.current.drsActive = false;
+        gameRef.current.drsTime = 0;
+      }
+    }
+
+    if (gameRef.current.boostTime > 0) {
+      gameRef.current.boostTime--;
+    }
       
       // Apply physics
       gameRef.current.carSpeed = Math.max(0, Math.min(gameRef.current.carSpeed, maxSpeed));
       gameRef.current.carSpeed -= drag;
-      
-      if (keys.ArrowLeft ) {
-        playerCar.position.x += handling;
-        // Tilt car when turning
-        playerCar.rotation.z = Math.min(playerCar.rotation.z + 0.01, -0.1);
-      } else if (keys.ArrowRight > 0.3) {
-        playerCar.position.x -= handling;
-        // Tilt car when turning
-        playerCar.rotation.z = Math.max(playerCar.rotation.z - 0.01, 0.1);
-      } else {
-        // Return to normal position
-        playerCar.rotation.z *= 0.9;
-      }
       
       // Update car position
       playerCar.position.z += gameRef.current.carSpeed;
@@ -439,17 +535,47 @@ if (keys.Space) {
       
       // Update AI cars
       let playerRank = 1;
-      aiCars.forEach((aiCar, index) => {
-        // Move AI car
-        aiCar.mesh.position.z += aiCar.speed;
+      for (let i = 0; i < aiCars.length; i++) {
+        const aiCar = aiCars[i];
         
-        // Add some wobble to AI cars for realism
-        aiCar.mesh.position.x += Math.sin(Date.now() * 0.001 + index) * aiCar.wobble;
-        aiCar.mesh.position.x = Math.max(-roadWidth/2 + 2, Math.min(roadWidth/2 - 2, aiCar.mesh.position.x));
+        // Only start moving after the race has started
+        if (gameRef.current.started) {
+          // Gradually increase speed
+          aiCar.speed = Math.min(aiCar.speed + aiCar.acceleration, aiCar.maxSpeed);
+          
+          // Move AI car
+          aiCar.mesh.position.z += aiCar.speed;
+          
+          // Add some wobble to AI cars for realism
+          aiCar.mesh.position.x += Math.sin(Date.now() * 0.001 + i) * aiCar.wobble;
+          aiCar.mesh.position.x = Math.max(-roadWidth/2 + 2, Math.min(roadWidth/2 - 2, aiCar.mesh.position.x));
+        }
+        
+        // Check for collisions with AI cars
+        if (checkCollision(playerCar, aiCar.mesh)) {
+          // Create fire particles at collision point
+          const collisionPoint = new THREE.Vector3(
+            (playerCar.position.x + aiCar.mesh.position.x) / 2,
+            (playerCar.position.y + aiCar.mesh.position.y) / 2,
+            (playerCar.position.z + aiCar.mesh.position.z) / 2
+          );
+          
+          const newFireParticles = createFireParticles(collisionPoint);
+          newFireParticles.forEach(particle => {
+            scene.add(particle);
+          });
+          setFireParticles(prev => [...prev, ...newFireParticles]);
+          
+          // Stop the game
+          setCollision(true);
+          gameRef.current.gameOver = true;
+          setGameOver(true);
+          return;
+        }
         
         // Keep AI cars from bunching up too much
         for (let j = 0; j < aiCars.length; j++) {
-          if (index !== j) { // Fixed: using index instead of i
+          if (i !== j) {
             const dx = aiCar.mesh.position.x - aiCars[j].mesh.position.x;
             const dz = aiCar.mesh.position.z - aiCars[j].mesh.position.z;
             const distance = Math.sqrt(dx * dx + dz * dz);
@@ -478,7 +604,7 @@ if (keys.Space) {
         if (aiProgress > playerProgress && aiCar.lap <= maxLaps) {
           playerRank++;
         }
-      });
+      }
       
       gameRef.current.position = playerRank;
       setPosition(playerRank);
@@ -503,6 +629,7 @@ if (keys.Space) {
       
       // Handle lap completion
       if (playerCar.position.z > roadLength) {
+        // Reset car position immediately
         playerCar.position.z = 0;
         gameRef.current.lap += 1;
         setLap(gameRef.current.lap);
@@ -558,38 +685,107 @@ if (keys.Space) {
 
   // Function to start game
   const startGame = () => {
-    setCarSelection(false);
-    gameRef.current.selectedCar = selectedCar;
+    if (!playerName) {
+      const name = prompt('Enter your name:');
+      if (name) {
+        setPlayerName(name);
+        localStorage.setItem('playerName', name);
+        
+        // Generate AI car names if not already stored
+        if (aiCarNames.length === 0) {
+          const names = [
+            'Speed Demon', 'Thunder Bolt', 'Night Rider', 'Storm Chaser',
+            'Lightning Fast', 'Wind Walker', 'Fire Fox', 'Ice Dragon', 'Shadow Runner'
+          ];
+          setAiCarNames(names);
+          localStorage.setItem('aiCarNames', JSON.stringify(names));
+        }
+        
+        setCarSelection(false);
+      }
+    } else {
+      setCarSelection(false);
+    }
   };
   
   // Function to reset game
-  const resetGame = () => {
-    setGameOver(false);
-    setStarted(false);
-    setLap(1);
-    setScore(0);
-    setSpeedometer(0);
-    setPosition(1);
+  const handleResetGame = () => {
     setCarSelection(true);
-    
-    gameRef.current = {
-      score: 0,
-      lap: 1,
-      maxLaps: 5,
-      gameOver: false,
-      started: false,
-      speedometer: 0,
-      carSpeed: 0,
-      animation: null,
-      position: 1,
-      aiCars: [],
-      selectedCar: selectedCar
-    };
+    setStartingLights([false, false, false, false, false]);
+    setCountdownStarted(false);
+    setPlayerName('');
+    setAiCarNames([]);
+    localStorage.removeItem('playerName');
+    localStorage.removeItem('aiCarNames');
+    resetGameState();
   };
   
   // Car selection handler
   const handleCarSelection = (index) => {
     setSelectedCar(index);
+  };
+  
+  // Add starting lights effect
+  useEffect(() => {
+    if (!carSelection && !started && !gameOver && !countdownStarted) {
+      setCountdownStarted(true);
+       // Start the race
+      //  const startTime = Date.now();
+      //  setGameStartTime(startTime);
+       
+      //  setStarted(true);
+      // Turn on lights one by one
+      const turnOnLights = async () => {
+        // gameRef.current.started = true;
+        for (let i = 0; i < 5; i++) {
+          
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          setStartingLights(prev => {
+            const newLights = [...prev];
+            newLights[i] = true;
+            return newLights;
+          });
+        }
+        
+        // Wait 1 second with all lights on
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Start the race
+        const startTime = Date.now();
+        setGameStartTime(startTime);
+        gameRef.current.started = true;
+        setStarted(true);
+      };
+      
+      turnOnLights();
+    }
+  }, [carSelection, started, gameOver, countdownStarted]);
+  
+  // Add function to create name tags
+  const createNameTag = (name) => {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    canvas.width = 256;
+    canvas.height = 64;
+    
+    // Draw background
+    context.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    context.fillRect(0, 0, 256, 64);
+    
+    // Draw text
+    context.font = 'bold 32px Arial';
+    context.fillStyle = 'white';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(name, 128, 32);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(5, 1.25, 1);
+    sprite.position.set(0, 2, 0);
+    
+    return sprite;
   };
   
   return (
@@ -663,7 +859,7 @@ if (keys.Space) {
             <p className="text-2xl mb-6">Score: {score}</p>
             <button
               className="px-8 py-3 bg-red-600 hover:bg-red-700 rounded-lg text-xl font-bold transition-colors"
-              onClick={resetGame}
+              onClick={handleResetGame}
             >
               Play Again
             </button>
@@ -671,6 +867,21 @@ if (keys.Space) {
         )}
         
       
+
+        {/* {!carSelection && !started && !gameOver && (
+          <div className="absolute inset-0 flex items-center justify-center z-20">
+            <div className="flex space-x-4">
+              {startingLights.map((isOn, index) => (
+                <div
+                  key={index}
+                  className={`w-16 h-16 rounded-full transition-colors duration-300 ${
+                    isOn ? 'bg-red-600' : 'bg-gray-800'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )} */}
 
         {!carSelection && (
   <F1Dashboard 
@@ -687,73 +898,109 @@ if (keys.Space) {
   />
 )}
         {/* Mobile controls */}
-      {/* Mobile controls */}
-      {isMobile && !carSelection && !gameOver && (
-        <div className="fixed bottom-4 left-0 right-0 flex flex-col items-center">
-          {/* Start button for mobile */}
-          {!started && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <button
-                className="px-12 py-6 bg-green-600 rounded-full text-white text-2xl font-bold"
-                onTouchStart={() => {
-                  gameRef.current.started = true;
-                  setStarted(true);
-                }}
+        {isMobile && !carSelection && !gameOver && (
+          <div className="fixed bottom-0 left-0 right-0 flex flex-col items-center pb-4 z-50">
+            {/* Controls Container */}
+            <div className="w-full flex justify-between items-end px-4 gap-4">
+              {/* Left/Right Controls */}
+              <div className="flex flex-col gap-2">
+                <button 
+                  className="w-20 h-20 bg-black/50 backdrop-blur-sm rounded-full text-white text-3xl active:bg-black/70 transition-colors"
+                  onTouchStart={() => handleTouchStart('left')}
+                  onTouchEnd={() => handleTouchEnd('left')}
+                >
+                  ←
+                </button>
+                <button 
+                  className="w-20 h-20 bg-black/50 backdrop-blur-sm rounded-full text-white text-3xl active:bg-black/70 transition-colors"
+                  onTouchStart={() => handleTouchStart('right')}
+                  onTouchEnd={() => handleTouchEnd('right')}
+                >
+                  →
+                </button>
+              </div>
+              
+              {/* Vertical Controls */}
+              <div className="flex flex-col gap-2">
+                <button 
+                  className="w-20 h-20 bg-green-500/70 backdrop-blur-sm rounded-full text-white text-3xl active:bg-green-600/70 transition-colors"
+                  onTouchStart={() => handleTouchStart('accelerate')}
+                  onTouchEnd={() => handleTouchEnd('accelerate')}
+                >
+                  ↑
+                </button>
+                <button 
+                  className="w-20 h-20 bg-red-500/70 backdrop-blur-sm rounded-full text-white text-3xl active:bg-red-600/70 transition-colors"
+                  onTouchStart={() => handleTouchStart('brake')}
+                  onTouchEnd={() => handleTouchEnd('brake')}
+                >
+                  ↓
+                </button>
+              </div>
+              
+              {/* Boost Button */}
+              <button 
+                className="w-24 h-24 bg-purple-600/70 backdrop-blur-sm rounded-full flex items-center justify-center text-white font-bold text-lg active:bg-purple-700/70 transition-colors"
+                onTouchStart={() => handleTouchStart('boost')}
+                onTouchEnd={() => handleTouchEnd('boost')}
               >
-                START
+                BOOST
               </button>
             </div>
-          )}
-          
-          {/* Controls Container */}
-          <div className="w-full flex justify-between items-end px-4">
-            {/* Left/Right Controls */}
-            <div className="flex flex-col space-y-2">
-              <button 
-                className="w-16 h-16 bg-white/30 rounded-full text-white text-2xl"
-                onTouchStart={() => setMobileControls(prev => ({...prev, left: true}))}
-                onTouchEnd={() => setMobileControls(prev => ({...prev, left: false}))}
-              >
-                ←
-              </button>
-              <button 
-                className="w-16 h-16 bg-white/30 rounded-full text-white text-2xl"
-                onTouchStart={() => setMobileControls(prev => ({...prev, right: true}))}
-                onTouchEnd={() => setMobileControls(prev => ({...prev, right: false}))}
-              >
-                →
-              </button>
-            </div>
-            
-            {/* Vertical Controls */}
-            <div className="flex flex-col space-y-2">
-              <button 
-                className="w-16 h-16 bg-green-500/70 rounded-full text-white text-2xl"
-                onTouchStart={() => setMobileControls(prev => ({...prev, accelerate: true}))}
-                onTouchEnd={() => setMobileControls(prev => ({...prev, accelerate: false}))}
-              >
-                ↑
-              </button>
-              <button 
-                className="w-16 h-16 bg-red-500/70 rounded-full text-white text-2xl"
-                onTouchStart={() => setMobileControls(prev => ({...prev, brake: true}))}
-                onTouchEnd={() => setMobileControls(prev => ({...prev, brake: false}))}
-              >
-                ↓
-              </button>
-            </div>
-            
-            {/* Boost Button */}
-            <button 
-              className="w-24 h-24 bg-purple-600/70 rounded-full flex items-center justify-center text-white font-bold text-lg"
-              onTouchStart={() => setMobileControls(prev => ({...prev, boost: true}))}
-              onTouchEnd={() => setMobileControls(prev => ({...prev, boost: false}))}
-            >
-              BOOST
-            </button>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Dashboard for mobile */}
+        {!carSelection && isMobile && (
+          <div className="fixed top-0 left-0 right-0 p-4 z-50">
+            <div className="bg-black/50 backdrop-blur-sm rounded-lg p-4 flex justify-between items-center">
+              <div>
+                <div className="text-white text-sm">LAP</div>
+                <div className="text-white font-bold">{lap} / {maxLaps}</div>
+              </div>
+              <div>
+                <div className="text-white text-sm">POSITION</div>
+                <div className="text-white font-bold">{position}{getOrdinal(position)}</div>
+              </div>
+              <div>
+                <div className="text-white text-sm">SPEED</div>
+                <div className="text-white font-bold">{speedometer} KPH</div>
+              </div>
+              <div>
+                <div className="text-white text-sm">SCORE</div>
+                <div className="text-white font-bold">{score}</div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DRS Indicator for mobile */}
+        {!carSelection && isMobile && gameRef.current.drsActive && (
+          <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-purple-600/70 backdrop-blur-sm rounded-full px-6 py-2 text-white font-bold z-50">
+            DRS ACTIVE
+          </div>
+        )}
+
+        {/* Starting lights for mobile */}
+        {!carSelection && !started && !gameOver  && (
+          <div className="absolute inset-0 flex items-center justify-center z-20">
+            <div className="flex space-x-4 bg-black/30 backdrop-blur-sm p-6 rounded-2xl">
+              {startingLights.map((isOn, index) => (
+                <div
+                  key={index}
+                  className={`w-12 h-12 rounded-full transition-colors duration-300 ${
+                    isOn ? 'bg-red-600 shadow-lg shadow-red-600/50' : 'bg-gray-800'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Add Collision Screen */}
+        {collision && (
+          <CollisionScreen onRetry={handleResetGame} />
+        )}
       </div>
     </>
   );
