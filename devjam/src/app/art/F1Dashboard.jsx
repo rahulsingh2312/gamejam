@@ -276,7 +276,7 @@ const F1Dashboard = ({
       </div>
 
       {/* Mobile View */}
-      <div className="  w-full">
+      <div className=" hidden md:hidden w-full">
         {/* Main Dashboard */}
         <div className="bg-black/50   backdrop-blur-sm rounded-lg p-4 flex justify-between items-center">
           <div>

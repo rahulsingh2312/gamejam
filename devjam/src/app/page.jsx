@@ -14,6 +14,7 @@ import { useGameControls } from './game/hooks/useGameControls';
 import { useMobileControls } from './game/hooks/useMobileControls';
 import JoystickController    from './art/Keys';
 import { gameAudio } from './audio/GameAudio';
+import WalletIntegration from './components/WalletIntegration';
 
 export default function Home() {
   const mountRef = useRef(null);
@@ -1029,6 +1030,10 @@ if (isBoosting) {
           <CollisionScreen onRetry={handleResetGame} />
       
         )}
+
+        <div className="fixed z-[1000000] top-4 right-4">
+          <WalletIntegration />
+        </div>
       </div>
     </>
   );
