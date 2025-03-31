@@ -8,7 +8,8 @@ import {
   ArrowDown, 
   ArrowLeft, 
   ArrowRight, 
-  Zap 
+  Zap,
+  X
 } from 'lucide-react';
 
 const F1Dashboard = ({ 
@@ -24,7 +25,7 @@ const F1Dashboard = ({
   drsTime,
 }) => {
   const [showTireSelection, setShowTireSelection] = useState(false);
-  const [selectedTire, setSelectedTire] = useState( { name: 'Medium', color: '#FFDC00', durability: 40, wear: 50 });
+  const [selectedTire, setSelectedTire] = useState({ name: 'Medium', color: '#FFDC00', durability: 40, wear: 50 });
   const [changingTire, setChangingTire] = useState(false);
   const [countdownTimer, setCountdownTimer] = useState(3);
   const [pressedKeys, setPressedKeys] = useState({
@@ -35,11 +36,29 @@ const F1Dashboard = ({
     drs: false
   });
 
+  // Mobile view states
+  const [showTireMenu, setShowTireMenu] = useState(false);
+  const [showTopPlayers, setShowTopPlayers] = useState(false);
+  const [showSpeedometer, setShowSpeedometer] = useState(false);
+
   const tireTypes = [
     { name: 'Soft', color: '#FF4136', durability: 20, wear: 75 },
     { name: 'Medium', color: '#FFDC00', durability: 40, wear: 50 },
     { name: 'Hard', color: '#0074D9', durability: 60, wear: 25 }
   ];
+
+  // Handle mobile menu visibility
+  const toggleMobileMenu = (menu) => {
+    // Close all menus first
+    setShowTireMenu(false);
+    setShowTopPlayers(false);
+    setShowSpeedometer(false);
+    
+    // Then open the selected menu
+    if (menu === 'tires') setShowTireMenu(true);
+    if (menu === 'players') setShowTopPlayers(true);
+    if (menu === 'speed') setShowSpeedometer(true);
+  };
 
   // Tire Change Mechanism
   const initiateTireChange = () => {
@@ -157,6 +176,8 @@ const F1Dashboard = ({
         </div>
       )}
 
+      {/* Desktop View */}
+      <div className="hidden md:flex w-full justify-between items-start">
       {/* Left Panel - Car and Tire Info */}
       <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 space-y-3 shadow-lg">
         <div className="flex items-center space-x-3">
@@ -166,14 +187,10 @@ const F1Dashboard = ({
             className="h-12 w-12 mb-2"
           />
        <div className="flex flex-col">
-      <span className="text-lg font-bold"> {carModels[selectedCar].name}</span>
-      <span className="text-lg font-bold text-green-400"> Score: {score}</span>
+              <span className="text-lg font-bold">{carModels[selectedCar].name}</span>
+              <span className="text-lg font-bold text-green-400">Score: {score}</span>
+            </div>
     </div>
-          <br></br>
-          
-        </div>
-        
-
         
         {/* Compact Tire Change Button */}
         <div className="flex items-center space-x-2">
@@ -181,8 +198,7 @@ const F1Dashboard = ({
             onClick={initiateTireChange}
             className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 rounded-full p-2 transition-colors"
           >
-            
-            <LifeBuoy size={20} />   <Pen size={20} />  
+              <LifeBuoy size={20} /> <Pen size={20} />  
           </button>
           <div className="flex items-center space-x-1">
             <div 
@@ -210,7 +226,6 @@ const F1Dashboard = ({
             <div className="font-bold">{position}{getOrdinal(position)}</div>
           </div>
         </div>
-
    
         <div className='flex justify-center items-center gap-5'>
             {renderSpeedometer()}
@@ -226,47 +241,224 @@ const F1Dashboard = ({
             </button>
             <span className="text-xs mt-4">
               DRS: {drsActive ? 'ACTIVE' : 'INACTIVE'}
-              <br></br>
+                <br />
               Press Space 3 sec
-              <div className="text-sm">
-
-
-
-</div>
-            </span>
-
+              </span>
           </div>
       </div>
       </div>
 
       {/* Right Panel - Speed and Competitors */}
       <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-4 space-y-3 shadow-lg">
-        {/* Speedometer */}
-        {/* {renderSpeedometer()} */}
-        
         {/* Top Competitors */}
         <div>
           <div className="text-xs text-gray-400 mb-2">TOP 5 COMPETITORS</div>
           {topCompetitors.map((car, index) => (
             <div 
               key={index} 
-              className="flex justify-between text-sm hover:bg-white/10 rounded px-2 py-1 transition-colors"
-            >
-              <span className="font-bold">{index + 1}.</span>
-              <span>{carModels[car.teamIndex || 0].name}</span>
-            </div>
-          ))}
+                className="flex items-center justify-between text-sm hover:bg-white/10 rounded px-2 py-1 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-gray-400">{index + 1}.</span>
+                  <span className="font-medium">{car.name}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">{carModels[car.teamIndex || 0].name}</span>
+                  <div 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: `#${carModels[car.teamIndex || 0].color.toString(16).padStart(6, '0')}` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Mobile View */}
+      <div className="  w-full">
+        {/* Main Dashboard */}
+        <div className="bg-black/50   backdrop-blur-sm rounded-lg p-4 flex justify-between items-center">
+          <div>
+            <div className="text-white text-sm">LAP</div>
+            <div className="text-white font-bold">{lap} / {maxLaps}</div>
+          </div>
+          <div>
+            <div className="text-white text-sm">POSITION</div>
+            <div className="text-white font-bold">{position}{getOrdinal(position)}</div>
+          </div>
+          <div>
+            <div className="text-white text-sm">SPEED</div>
+            <div className="text-white font-bold">{speedometer} KPH</div>
+          </div>
+          <div>
+            <div className="text-white text-sm">SCORE</div>
+            <div className="text-white font-bold">{score}</div>
+          </div>
+        </div>
+
+        {/* Menu Toggle Buttons */}
+        <div className="mt-4 hidden  flex justify-between">
+          <button 
+            onClick={() => toggleMobileMenu('tires')}
+            className={`bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white ${showTireMenu ? 'bg-blue-500/50' : ''}`}
+          >
+            Tires
+          </button>
+          <button 
+            onClick={() => toggleMobileMenu('speed')}
+            className={`bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white ${showSpeedometer ? 'bg-blue-500/50' : ''}`}
+          >
+            Speedometer
+          </button>
+          <button 
+            onClick={() => toggleMobileMenu('players')}
+            className={`bg-black/50 backdrop-blur-sm rounded-lg px-4 py-2 text-white ${showTopPlayers ? 'bg-blue-500/50' : ''}`}
+          >
+            Top Players
+          </button>
+        </div>
+
+        {/* Sliding Tire Menu */}
+        <div className={`fixed top-0 left-0 h-full w-64 bg-black/80 backdrop-blur-sm transform transition-transform duration-300 ease-in-out ${showTireMenu ? 'translate-x-0' : '-translate-x-full'}`}>
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-white text-xl font-bold">Tire Selection</h2>
+              <button 
+                onClick={() => setShowTireMenu(false)}
+                className="text-white hover:text-gray-300"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex flex-col space-y-4">
+              <div className="flex items-center space-x-3">
+                <img
+                  src={`https://media.formula1.com/content/dam/fom-website/teams/2025/${carModels[selectedCar].image}-logo.png`}
+                  alt={`${carModels[selectedCar].name} Logo`}
+                  className="h-12 w-12"
+                />
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold">{carModels[selectedCar].name}</span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={initiateTireChange}
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 rounded-full p-2 transition-colors"
+                >
+                  <LifeBuoy size={20} /> <Pen size={20} />  
+                </button>
+                <div className="flex items-center space-x-1">
+                  <div 
+                    className="w-4 h-4 rounded-full"
+                    style={{ backgroundColor: selectedTire?.color || '#888' }}
+                  />
+                  <span className="text-sm">{selectedTire?.name || 'No Tire'}</span>
+                  <span className="text-xs text-gray-400 ml-1">
+                    {selectedTire ? `${selectedTire.wear}% Wear` : ''}
+                  </span>
+                </div>
+              </div>
+              <div className="mt-4 p-4 bg-gray-700/30 rounded-lg">
+                <h3 className="text-white font-bold mb-2">Current Tire Info</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Type:</span>
+                    <span className="font-bold">{selectedTire.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Durability:</span>
+                    <span className="font-bold">{selectedTire.durability}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Wear:</span>
+                    <span className="font-bold">{selectedTire.wear}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sliding Speedometer Menu */}
+        <div className={`fixed top-0 right-0 h-full w-64 bg-black/80 backdrop-blur-sm transform transition-transform duration-300 ease-in-out ${showSpeedometer ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-white text-xl font-bold">Speedometer</h2>
+              <button 
+                onClick={() => setShowSpeedometer(false)}
+                className="text-white hover:text-gray-300"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex flex-col items-center space-y-6">
+              <div className="flex justify-center">
+                {renderSpeedometer()}
+              </div>
+              <div className="flex flex-col items-center">
+                <button 
+                  className={`rounded-full p-3 transition-colors ${
+                    drsActive 
+                      ? 'bg-green-500 hover:bg-green-600' 
+                      : 'bg-red-500 hover:bg-red-600'
+                  }`}
+                >
+                  <Zap size={24} />
+                </button>
+                <span className="text-xs mt-4 text-center">
+                  DRS: {drsActive ? 'ACTIVE' : 'INACTIVE'}
+                  <br />
+                  Press Space 3 sec
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sliding Top Players Menu */}
+        <div className={`fixed top-0 right-0 h-full w-64 bg-black/80 backdrop-blur-sm transform transition-transform duration-300 ease-in-out ${showTopPlayers ? 'translate-x-0' : 'translate-x-full'}`}>
+          <div className="p-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-white text-xl font-bold">Top Players</h2>
+              <button 
+                onClick={() => setShowTopPlayers(false)}
+                className="text-white hover:text-gray-300"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="space-y-4">
+              {topCompetitors.map((car, index) => (
+                <div key={index} className="bg-white/10 backdrop-blur-sm rounded-lg p-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-white font-bold">{car.name}</div>
+                      <div className="text-gray-300 text-sm">{carModels[car.teamIndex || 0].name}</div>
+                    </div>
+                    <div className="text-white font-bold">
+                      {index + 1}{getOrdinal(index + 1)}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-gray-300 text-sm">
+                    Lap: {car.lap} / {maxLaps}
+                  </div>
+            </div>
+          ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
            {/* Control Indicators */}
-           <div className="absolute -bottom-full left-4 pointer-events-auto">
-           <div className='flex justify-center items-center mx-auto'> Tut </div>
+      <div className="absolute md:block hidden -bottom-full left-4 pointer-events-auto">
+        <div className='flex justify-center items-center mx-auto'>Tut</div>
         <div className="flex justify-center space-x-4 mt-2">
-            
           <div className="grid grid-cols-3 grid-rows-3 gap-1 w-fit h-24 bg-black/50 rounded-lg p-2">
             <div></div>
             <div
-              className={`bg-white/10 w-fit p-2  rounded flex items-center justify-center 
+              className={`bg-white/10 w-fit p-2 rounded flex items-center justify-center 
                 ${pressedKeys.up ? 'bg-blue-500/50' : ''}`}
             >
                Gas⛽️
@@ -274,7 +466,7 @@ const F1Dashboard = ({
             <div></div>
             
             <div
-              className={`bg-white/10  w-fit p-2  rounded flex items-center mx-auto justify-center 
+              className={`bg-white/10 w-fit p-2 rounded flex items-center mx-auto justify-center 
                 ${pressedKeys.left ? 'bg-blue-500/50' : ''}`}
             >
                 <ArrowLeft size={20} />
@@ -298,7 +490,6 @@ const F1Dashboard = ({
           </div>
         </div>
       </div>
-     
     </div>
   );
 };

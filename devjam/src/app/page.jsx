@@ -12,6 +12,8 @@ import { GameScene } from './game/components/GameScene';
 import { useGameState } from './game/hooks/useGameState';
 import { useGameControls } from './game/hooks/useGameControls';
 import { useMobileControls } from './game/hooks/useMobileControls';
+import JoystickController    from './art/Keys';
+import { gameAudio } from './audio/GameAudio';
 
 export default function Home() {
   const mountRef = useRef(null);
@@ -67,6 +69,10 @@ export default function Home() {
     }
     return [];
   });
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showTireMenu, setShowTireMenu] = useState(false);
+  const [showTopPlayers, setShowTopPlayers] = useState(false);
+  const [showBoostButton, setShowBoostButton] = useState(true);
   
   const {
     gameState,
@@ -93,7 +99,7 @@ export default function Home() {
     { name: "Alpine", color: 0x0090FF, secondaryColor: 0xFF0000, image: "alpine" },
     { name: "Williams", color: 0x005AFF, secondaryColor: 0xFFFFFF, image: "williams" },
     { name: "Racing Bulls", color: 0x2B4562, secondaryColor: 0xFFFFFF, image: "racing-bulls" },
-    { name: "Kick Sauber", color: 0x900000, secondaryColor: 0xFFFFFF, image: "kick-sauber" },
+    { name: "Kick Sauber", color: 0x52E252	, secondaryColor: 0x000000, image: "kick-sauber" },
     { name: "Haas F1", color: 0xFFFFFF, secondaryColor: 0xFF0000, image: "haas" }
   ];
   
@@ -310,8 +316,8 @@ for (let i = 0; i < 9; i++) {
   
   aiCars.push({
     mesh: aiCar,
-    speed: 0,
-    maxSpeed: 0.4 + Math.random() * 0.6, // Increased max speed
+    speed: 100,
+    maxSpeed: 0.5 + Math.random() * 0.6, // Increased max speed
     acceleration: 0.002 + Math.random() * 0.003, // Increased acceleration
     wobble: Math.random() * 0.03,
     lap: 1,
@@ -344,7 +350,7 @@ for (let i = 0; i < 9; i++) {
     // Game constants
     const maxSpeed = 1.2;
     const acceleration = 0.005;
-    const braking = 0.01;
+    const braking = -0.1;
     const handling = 0.15;
     const drag = 0.001;
     
@@ -397,7 +403,7 @@ const checkCollision = (car1, car2) => {
   const dx = car1.position.x - car2.position.x;
   const dz = car1.position.z - car2.position.z;
   const distance = Math.sqrt(dx * dx + dz * dz);
-  console.log(distance < 2 ,"collision" );
+  // console.log(distance < 2 ,"" );
   // Make collision detection less sensitive
   return distance < 2; // Reduced from 2 to make collisions less frequent
 };
@@ -476,49 +482,77 @@ const checkCollision = (car1, car2) => {
         });
       }
       
-      // Handle car controls - keyboard or mobile joystick
-    if (keys.ArrowUp || gameState.mobileControls.accelerate) {
-      gameRef.current.carSpeed += acceleration;
-    }
-
-    if (keys.ArrowDown || gameState.mobileControls.brake) {
-      gameRef.current.carSpeed -= braking;
-    }
-
-    if (keys.ArrowLeft || gameState.mobileControls.left) {
-      playerCar.position.x += handling;
-      playerCar.rotation.z = Math.min(playerCar.rotation.z + 0.01, -0.1);
-    } else if (keys.ArrowRight || gameState.mobileControls.right) {
-      playerCar.position.x -= handling;
-      playerCar.rotation.z = Math.max(playerCar.rotation.z - 0.01, 0.1);
-    } else {
-      playerCar.rotation.z *= 0.9;
-    }
-
-    // Handle boost
-    if (keys.Space || gameState.mobileControls.boost) {
-      gameRef.current.drsTime++;
+      // Log current control states
+      console.log('Animation Loop - Controls:', {
+        keyboard: keys,
+        mobile: gameState.mobileControls,
+        carSpeed: gameRef.current.carSpeed
+      });
       
-      if (!gameRef.current.drsActive) {
-        gameRef.current.drsActive = true;
-      }
-      
-      gameRef.current.carSpeed += 0.2;
-      
-      if (gameRef.current.drsTime >= 5) {
-        gameRef.current.drsActive = false;
-        gameRef.current.drsTime = 0;
-      }
-    } else {
-      if (gameRef.current.drsActive) {
-        gameRef.current.drsActive = false;
-        gameRef.current.drsTime = 0;
-      }
-    }
+// Inside your animation loop, replace the code for handling controls with this:
 
-    if (gameRef.current.boostTime > 0) {
-      gameRef.current.boostTime--;
-    }
+// Handle car controls - keyboard or mobile joystick
+let isAccelerating = keys.ArrowUp;
+let isBraking = keys.ArrowDown;
+let isTurningLeft = keys.ArrowLeft;
+let isTurningRight = keys.ArrowRight;
+let isBoosting = keys.Space;
+
+// Check if mobile controls are active and override keyboard controls
+if (gameState && gameState.mobileControls) {
+  if (gameState.mobileControls.accelerate) isAccelerating = true;
+  if (gameState.mobileControls.brake) isBraking = true;
+  if (gameState.mobileControls.left) isTurningLeft = true;
+  if (gameState.mobileControls.right) isTurningRight = true;
+  if (gameState.mobileControls.boost) isBoosting = true;
+}
+
+// Handle audio for acceleration
+if (isAccelerating) {
+  gameAudio.playEngine();
+  gameRef.current.carSpeed += acceleration;
+} else {
+  gameAudio.stopEngine();
+}
+
+// Handle steering
+if (isTurningLeft) {
+  playerCar.position.x += handling;
+  playerCar.rotation.z = Math.min(playerCar.rotation.z + 0.01, 0.1);
+} else if (isTurningRight) {
+  playerCar.position.x -= handling;
+  playerCar.rotation.z = Math.max(playerCar.rotation.z - 0.01, -0.1);
+} else {
+  playerCar.rotation.z *= 0.9;
+}
+
+// Handle boost audio
+if (isBoosting) {
+  gameAudio.playBoost();
+  gameRef.current.drsTime++;
+  
+  if (!gameRef.current.drsActive) {
+    gameRef.current.drsActive = true;
+  }
+  
+  gameRef.current.carSpeed += 0.02;
+  
+  if (gameRef.current.drsTime >= 50) {
+    gameRef.current.drsActive = false;
+    gameRef.current.drsTime = 0;
+    gameAudio.stopBoost();
+  }
+} else {
+  if (gameRef.current.drsActive) {
+    gameRef.current.drsActive = false;
+    gameRef.current.drsTime = 0;
+    gameAudio.stopBoost();
+  }
+}
+
+      if (gameRef.current.boostTime > 0) {
+        gameRef.current.boostTime--;
+      }
       
       // Apply physics
       gameRef.current.carSpeed = Math.max(0, Math.min(gameRef.current.carSpeed, maxSpeed));
@@ -553,6 +587,9 @@ const checkCollision = (car1, car2) => {
         
         // Check for collisions with AI cars
         if (checkCollision(playerCar, aiCar.mesh)) {
+          // Play crash sound
+          gameAudio.playCrash();
+          
           // Create fire particles at collision point
           const collisionPoint = new THREE.Vector3(
             (playerCar.position.x + aiCar.mesh.position.x) / 2,
@@ -623,6 +660,7 @@ const checkCollision = (car1, car2) => {
             coin.visible = false;
             gameRef.current.score += 10;
             setScore(gameRef.current.score);
+            gameAudio.playCoin();
           }
         }
       });
@@ -633,6 +671,7 @@ const checkCollision = (car1, car2) => {
         playerCar.position.z = 0;
         gameRef.current.lap += 1;
         setLap(gameRef.current.lap);
+        gameAudio.playLap();
         
         if (gameRef.current.lap > maxLaps) {
           gameRef.current.gameOver = true;
@@ -680,7 +719,7 @@ const checkCollision = (car1, car2) => {
         mountRef.current.removeChild(rendererRef.current.domElement);
       }
     };
-  }, [carSelection, selectedCar]);
+  }, [carSelection, selectedCar ]);
   
 
   // Function to start game
@@ -710,14 +749,8 @@ const checkCollision = (car1, car2) => {
   
   // Function to reset game
   const handleResetGame = () => {
-    setCarSelection(true);
-    setStartingLights([false, false, false, false, false]);
-    setCountdownStarted(false);
-    setPlayerName('');
-    setAiCarNames([]);
-    localStorage.removeItem('playerName');
-    localStorage.removeItem('aiCarNames');
-    resetGameState();
+    gameAudio.stopAll();
+    window.location.reload();
   };
   
   // Car selection handler
@@ -729,28 +762,20 @@ const checkCollision = (car1, car2) => {
   useEffect(() => {
     if (!carSelection && !started && !gameOver && !countdownStarted) {
       setCountdownStarted(true);
-       // Start the race
-      //  const startTime = Date.now();
-      //  setGameStartTime(startTime);
-       
-      //  setStarted(true);
-      // Turn on lights one by one
+      
       const turnOnLights = async () => {
-        // gameRef.current.started = true;
         for (let i = 0; i < 5; i++) {
-          
           await new Promise(resolve => setTimeout(resolve, 1000));
           setStartingLights(prev => {
             const newLights = [...prev];
             newLights[i] = true;
             return newLights;
           });
+          if (i === 0) gameAudio.playCountdown();
         }
         
-        // Wait 1 second with all lights on
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Start the race
         const startTime = Date.now();
         setGameStartTime(startTime);
         gameRef.current.started = true;
@@ -788,6 +813,35 @@ const checkCollision = (car1, car2) => {
     return sprite;
   };
   
+  const simulateSpaceKey = (isPressed) => {
+    // Create a keyboard event
+    const event = new KeyboardEvent(isPressed ? 'keydown' : 'keyup', {
+      key: ' ',
+      code: 'Space',
+      keyCode: 32,
+      which: 32,
+      bubbles: true,
+      cancelable: true
+    });
+    
+    // Dispatch the event
+    document.dispatchEvent(event);
+  };
+
+  // Add useEffect for boost button timer
+  // useEffect(() => {
+  //   if (!isMobile || carSelection || gameOver) return;
+
+  //   const boostInterval = setInterval(() => {
+  //     setShowBoostButton(true);
+  //     setTimeout(() => {
+  //       setShowBoostButton(false);
+  //     }, 2000);
+  //   }, 10000);
+
+  //   return () => clearInterval(boostInterval);
+  // }, [isMobile, carSelection, gameOver]);
+
   return (
     <>
       <Head>
@@ -883,7 +937,7 @@ const checkCollision = (car1, car2) => {
           </div>
         )} */}
 
-        {!carSelection && (
+        {!carSelection  && (
   <F1Dashboard 
     position={position}
     lap={lap}
@@ -899,80 +953,52 @@ const checkCollision = (car1, car2) => {
 )}
         {/* Mobile controls */}
         {isMobile && !carSelection && !gameOver && (
-          <div className="fixed bottom-0 left-0 right-0 flex flex-col items-center pb-4 z-50">
-            {/* Controls Container */}
-            <div className="w-full flex justify-between items-end px-4 gap-4">
-              {/* Left/Right Controls */}
-              <div className="flex flex-col gap-2">
-                <button 
-                  className="w-20 h-20 bg-black/50 backdrop-blur-sm rounded-full text-white text-3xl active:bg-black/70 transition-colors"
-                  onTouchStart={() => handleTouchStart('left')}
-                  onTouchEnd={() => handleTouchEnd('left')}
-                >
-                  ←
-                </button>
-                <button 
-                  className="w-20 h-20 bg-black/50 backdrop-blur-sm rounded-full text-white text-3xl active:bg-black/70 transition-colors"
-                  onTouchStart={() => handleTouchStart('right')}
-                  onTouchEnd={() => handleTouchEnd('right')}
-                >
-                  →
-                </button>
-              </div>
-              
-              {/* Vertical Controls */}
-              <div className="flex flex-col gap-2">
-                <button 
-                  className="w-20 h-20 bg-green-500/70 backdrop-blur-sm rounded-full text-white text-3xl active:bg-green-600/70 transition-colors"
-                  onTouchStart={() => handleTouchStart('accelerate')}
-                  onTouchEnd={() => handleTouchEnd('accelerate')}
-                >
-                  ↑
-                </button>
-                <button 
-                  className="w-20 h-20 bg-red-500/70 backdrop-blur-sm rounded-full text-white text-3xl active:bg-red-600/70 transition-colors"
-                  onTouchStart={() => handleTouchStart('brake')}
-                  onTouchEnd={() => handleTouchEnd('brake')}
-                >
-                  ↓
-                </button>
-              </div>
-              
-              {/* Boost Button */}
-              <button 
-                className="w-24 h-24 bg-purple-600/70 backdrop-blur-sm rounded-full flex items-center justify-center text-white font-bold text-lg active:bg-purple-700/70 transition-colors"
-                onTouchStart={() => handleTouchStart('boost')}
-                onTouchEnd={() => handleTouchEnd('boost')}
-              >
-                BOOST
-              </button>
+          <div className="fixed bottom-0 left-0 right-0 flex justify-between items-end p-4 z-50">
+            {/* Joystick on the left */}
+            <div className="flex items-center">
+           
+              <JoystickController  />
             </div>
+
+            {/* Boost button on the right */}
+            {showBoostButton && (
+              <button
+                className="w-24 select-none h-24 mb-20 bg-gradient-to-br from-red-500/80 to-red-700/80 
+                  rounded-2xl flex items-center justify-center text-white font-bold text-xl 
+                 
+                 "
+                onTouchStart={(e) => {
+                  e.preventDefault();
+                  simulateSpaceKey(true);
+                }}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  simulateSpaceKey(true);
+                }}
+                onMouseUp={(e) => {
+                  e.preventDefault();
+                  simulateSpaceKey(false);
+                }}
+                onMouseLeave={(e) => {
+                  e.preventDefault();
+                  simulateSpaceKey(false);
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  simulateSpaceKey(false);
+                }}
+              >
+                <div className=" select-none ">
+                  DRS
+                </div>
+              </button>
+            )}
+
+  
           </div>
         )}
 
-        {/* Dashboard for mobile */}
-        {!carSelection && isMobile && (
-          <div className="fixed top-0 left-0 right-0 p-4 z-50">
-            <div className="bg-black/50 backdrop-blur-sm rounded-lg p-4 flex justify-between items-center">
-              <div>
-                <div className="text-white text-sm">LAP</div>
-                <div className="text-white font-bold">{lap} / {maxLaps}</div>
-              </div>
-              <div>
-                <div className="text-white text-sm">POSITION</div>
-                <div className="text-white font-bold">{position}{getOrdinal(position)}</div>
-              </div>
-              <div>
-                <div className="text-white text-sm">SPEED</div>
-                <div className="text-white font-bold">{speedometer} KPH</div>
-              </div>
-              <div>
-                <div className="text-white text-sm">SCORE</div>
-                <div className="text-white font-bold">{score}</div>
-              </div>
-            </div>
-          </div>
-        )}
+        
 
         {/* DRS Indicator for mobile */}
         {!carSelection && isMobile && gameRef.current.drsActive && (
@@ -999,7 +1025,9 @@ const checkCollision = (car1, car2) => {
 
         {/* Add Collision Screen */}
         {collision && (
+          
           <CollisionScreen onRetry={handleResetGame} />
+      
         )}
       </div>
     </>
