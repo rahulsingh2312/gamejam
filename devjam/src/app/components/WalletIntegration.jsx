@@ -21,7 +21,7 @@ const WalletIntegration = () => {
     <ConnectionProvider endpoint={HELIUS_RPC}>
       <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>
-          <div className="flex flex-col items-center gap-4 mt-10">
+          <div className="flex md:flex-col items-center md:gap-4 md:mt-10">
             <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
             <WalletMultiButton
               style={{
@@ -58,7 +58,7 @@ const TransactionButton = () => {
   return (
     <button
       onClick={handleCopy}
-      className={`px-4 ml-14 py-2 rounded-lg font-bold transition-all duration-200 border ${
+      className={`px-4 md:ml-14 ml-4 py-2 rounded-lg font-bold transition-all duration-200 border ${
         !copied
           ? 'bg-transparent hover:bg-green-700 border-white text-white'
           : 'bg-transparent border-white cursor-crosshair text-green-600'
