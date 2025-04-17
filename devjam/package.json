@@ -25,6 +25,7 @@
     "pino-pretty": "^13.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-hot-toast": "^2.5.2",
     "react-slick": "^0.30.3",
     "sinclair": "^0.2.0",
     "slick-carousel": "^1.8.1",
