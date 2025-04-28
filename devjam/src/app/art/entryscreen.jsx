@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Slider from 'react-slick';
 import "slick-carousel/slick/slick.css"; 
 import "slick-carousel/slick/slick-theme.css";
@@ -32,10 +32,46 @@ const CopyNotification = ({ show, onHide }) => {
   );
 };
 
+const InfoPopup = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed top-4 left-4 bg-white border-2 border-gray-300 shadow-lg z-[9999] p-4 max-w-sm transform transition-all duration-300 ease-in-out">
+      <div className="flex justify-between items-start mb-4">
+        <h3 className="text-lg font-bold text-gray-800">Contact Information</h3>
+        <button 
+          onClick={onClose}
+          className="text-gray-500 hover:text-gray-700 text-xl font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+        >
+          ×
+        </button>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <p className="text-sm text-gray-600 mb-1">X (Twitter) ID:</p>
+          <p className="text-sm font-mono bg-gray-100 p-2 rounded">@ares_racing</p>
+        </div>
+        <div>
+          <p className="text-sm text-gray-600 mb-1">Contract Address:</p>
+          <p className="text-sm font-mono bg-gray-100 p-2 rounded break-all">3mSyvNaJrV7912we42p2Pq6EzvojtczULPPfqekSpump</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const PaymentModal = ({ isOpen, onClose, onConfirm, carName }) => {
   const { publicKey, sendTransaction } = useWallet();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCopyNotification, setShowCopyNotification] = useState(false);
+  const [showInfoPopup, setShowInfoPopup] = useState(true);
+
+  // Reset showInfoPopup when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setShowInfoPopup(true);
+    }
+  }, [isOpen]);
 
   const handleCopyAddress = async () => {
     try {
@@ -84,6 +120,7 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, carName }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
       <CopyNotification show={showCopyNotification} onHide={() => setShowCopyNotification(false)} />
+      <InfoPopup className='z-[9999]' isOpen={showInfoPopup} onClose={() => setShowInfoPopup(false)} />
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
         <h2 className="text-2xl font-bold mb-4 text-black">Unlock Premium Car</h2>
         <p className="text-gray-700 mb-4">
@@ -91,7 +128,7 @@ const PaymentModal = ({ isOpen, onClose, onConfirm, carName }) => {
         </p>
         <div className="bg-gray-100 p-4 rounded-lg mb-6">
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-600 break-all">{"ARESgaTi8Mtazd.....qswHHg3L4Zfh9"}</p>
+            <p className="text-sm text-gray-600 break-all">{RECIPIENT_ADDRESS}</p>
             <button
               onClick={handleCopyAddress}
               className="ml-4 px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
