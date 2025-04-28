@@ -32,6 +32,7 @@ const WalletIntegration = () => {
               }}
               className="!bg-red-700 hover:!bg-red-800"
             />
+            <a target='_blank' href='https://x.com/F1racedotfun'>X : @f1racedotfun</a>
             <TransactionButton />
           </div>
         </WalletModalProvider>
