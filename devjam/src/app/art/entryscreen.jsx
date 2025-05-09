@@ -49,11 +49,11 @@ const InfoPopup = ({ isOpen, onClose }) => {
       <div className="space-y-3">
         <div>
           <p className="text-sm text-gray-600 mb-1">X (Twitter) ID:</p>
-          <p className="text-sm font-mono bg-gray-100 p-2 rounded">@ares_racing</p>
+          <p className="text-sm font-mono bg-gray-100 p-2 rounded">@f1racedotfun</p>
         </div>
         <div>
           <p className="text-sm text-gray-600 mb-1">Contract Address:</p>
-          <p className="text-sm font-mono bg-gray-100 p-2 rounded break-all">3mSyvNaJrV7912we42p2Pq6EzvojtczULPPfqekSpump</p>
+          <p className="text-sm font-mono bg-gray-100 p-2 rounded break-all">coin coming soon </p>
         </div>
       </div>
     </div>
